@@ -1,0 +1,15 @@
+node_modules
+.serverless
+
+.env
+
+.serverless/
+
+# Database (Prisma)
+prisma/migrations/
+
+# Jest config secrets
+jest.config.js
+
+# Package manager
+pnpm-lock.yaml

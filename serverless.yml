@@ -1,0 +1,160 @@
+org: awsapps
+
+app: serverless-medical-appointments
+
+service: medical-appointments
+
+plugins:
+  - serverless-dotenv-plugin
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ${env:MY_APP_REGION, 'sa-east-1'}
+  environment:
+    APPOINTMENTS_TABLE: ${self:service}-${sls:stage}-appointments
+    SNS_TOPIC_ARN: !Ref AppointmentNotificationTopic
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+      Resource:
+        - Fn::GetAtt: [AppointmentsTable, Arn]
+
+    - Effect: Allow
+      Action:
+        - sns:Publish
+      Resource:
+        - !Ref AppointmentNotificationTopic
+
+resources:
+  Resources:
+    AppointmentsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.APPOINTMENTS_TABLE}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        BillingMode: PROVISIONED
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+
+    # SNS Topic
+    AppointmentNotificationTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: ${self:service}-${sls:stage}-appointment-notifications
+        DisplayName: Appointment Notifications
+        Subscription:
+          - Protocol: email
+            Endpoint: ${env:SNS_TEST_EMAIL, 'example@gmail.com'}
+
+    # SQS Queues
+    AppointmentPEQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-${sls:stage}-appointments-pe
+
+    AppointmentCLQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-${sls:stage}-appointments-cl
+
+    # Policies for SNS to write to SQS
+    AppointmentPEQueuePolicy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        Queues:
+          - !Ref AppointmentPEQueue
+        PolicyDocument:
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: sns.amazonaws.com
+              Action: sqs:SendMessage
+              Resource: !GetAtt AppointmentPEQueue.Arn
+              Condition:
+                ArnEquals:
+                  aws:SourceArn: !Ref AppointmentNotificationTopic
+
+    AppointmentCLQueuePolicy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        Queues:
+          - !Ref AppointmentCLQueue
+        PolicyDocument:
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: sns.amazonaws.com
+              Action: sqs:SendMessage
+              Resource: !GetAtt AppointmentCLQueue.Arn
+              Condition:
+                ArnEquals:
+                  aws:SourceArn: !Ref AppointmentNotificationTopic
+
+    # SNS subscriptions with filters
+    SNSToAppointmentPEQueueSubscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+        TopicArn: !Ref AppointmentNotificationTopic
+        Protocol: sqs
+        Endpoint: !GetAtt AppointmentPEQueue.Arn
+        FilterPolicy:
+          countryISO:
+            - "PE"
+        FilterPolicyScope: "MessageAttributes"
+
+    SNSToAppointmentCLQueueSubscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+        TopicArn: !Ref AppointmentNotificationTopic
+        Protocol: sqs
+        Endpoint: !GetAtt AppointmentCLQueue.Arn
+        FilterPolicy:
+          countryISO:
+            - "CL"
+        FilterPolicyScope: "MessageAttributes"
+
+functions:
+  createAppointment:
+    handler: src/presentation/handlers/appointments.createAppointment
+    events:
+      - httpApi:
+          path: /appointments
+          method: post
+
+  getAppointments:
+    handler: src/presentation/handlers/appointments.getAppointments
+    events:
+      - httpApi:
+          path: /appointments
+          method: get
+
+  getAppointmentById:
+    handler: src/presentation/handlers/appointments.getAppointmentById
+    events:
+      - httpApi:
+          path: /appointments/{id}
+          method: get
+
+  appointmentPE:
+    handler: src/presentation/handlers/appointments-pe.createAppointmentPE
+    events:
+      - sqs:
+          arn: !GetAtt AppointmentPEQueue.Arn
+
+  appointmentCL:
+    handler: src/presentation/handlers/appointments-cl.createAppointmentCL
+    events:
+      - sqs:
+          arn: !GetAtt AppointmentCLQueue.Arn
