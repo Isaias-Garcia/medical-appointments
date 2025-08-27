@@ -14,6 +14,7 @@ provider:
   environment:
     APPOINTMENTS_TABLE: ${self:service}-${sls:stage}-appointments
     SNS_TOPIC_ARN: !Ref AppointmentNotificationTopic
+    EVENT_BUS_ARN: !GetAtt AppointmentEventBus.Arn
   iamRoleStatements:
     - Effect: Allow
       Action:
@@ -30,6 +31,12 @@ provider:
         - sns:Publish
       Resource:
         - !Ref AppointmentNotificationTopic
+
+    - Effect: Allow
+      Action:
+        - events:PutEvents
+      Resource:
+        - !GetAtt AppointmentEventBus.Arn
 
 resources:
   Resources:
@@ -68,6 +75,17 @@ resources:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: ${self:service}-${sls:stage}-appointments-cl
+
+    ProcessAppointmentsQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-${sls:stage}-process-appointments
+
+    # EventBridge
+    AppointmentEventBus:
+      Type: AWS::Events::EventBus
+      Properties:
+        Name: ${self:service}-${sls:stage}-appointment-eventbus
 
     # Policies for SNS to write to SQS
     AppointmentPEQueuePolicy:
@@ -125,6 +143,35 @@ resources:
             - "CL"
         FilterPolicyScope: "MessageAttributes"
 
+    # EventBridge rules
+    AppointmentProcessRule:
+      Type: AWS::Events::Rule
+      Properties:
+        EventBusName: !Ref AppointmentEventBus
+        EventPattern:
+          source: ["appointment-service"]
+          detail-type: ["Appointment Created"]
+        State: ENABLED
+        Targets:
+          - Arn: !GetAtt ProcessAppointmentsQueue.Arn
+            Id: "ProcessAppointmentsTarget"
+
+    ProcessAppointmentQueuePolicy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        Queues:
+          - !Ref ProcessAppointmentsQueue
+        PolicyDocument:
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: events.amazonaws.com
+              Action: sqs:SendMessage
+              Resource: !GetAtt ProcessAppointmentsQueue.Arn
+              Condition:
+                ArnEquals:
+                  aws:SourceArn: !GetAtt AppointmentProcessRule.Arn
+
 functions:
   createAppointment:
     handler: src/presentation/handlers/appointments.createAppointment
@@ -146,6 +193,12 @@ functions:
       - httpApi:
           path: /appointments/{id}
           method: get
+
+  updateAppointment:
+    handler: src/presentation/handlers/appointments.updateAppointment
+    events:
+      - sqs:
+          arn: !GetAtt ProcessAppointmentsQueue.Arn
 
   appointmentPE:
     handler: src/presentation/handlers/appointments-pe.createAppointmentPE
