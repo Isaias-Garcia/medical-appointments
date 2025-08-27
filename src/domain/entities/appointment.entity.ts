@@ -1,12 +1,23 @@
+import { CountryISO } from "../../shared/types";
+
 export class AppointmentEntity {
   constructor(
+    public id: string,
     public insuredId: string,
     public scheduleId: number,
-    public countryISO: "PE" | "CL"
+    public countryISO: CountryISO,
+    public status: string
   ) {}
 
   public static fromJson(object: { [key: string]: any }): AppointmentEntity {
-    const { insuredId, scheduleId, countryISO } = object;
+    const { id, insuredId, scheduleId, countryISO, status } = object;
+
+    if (!id || typeof id !== "string") {
+      throw "id is required and must be a non-empty string";
+    }
+    if (!id.trim()) {
+      throw "id cannot be empty";
+    }
 
     if (!insuredId || typeof insuredId !== "string") {
       throw "insuredId is required and must be a string";
@@ -20,6 +31,15 @@ export class AppointmentEntity {
       throw "countryISO is required and must be either 'PE' or 'CL'";
     }
 
-    return new AppointmentEntity(insuredId, scheduleId, countryISO);
+    if (status !== undefined) {
+      if (typeof status !== "string") {
+        throw "status must be a string";
+      }
+      if (!status.trim()) {
+        throw "status cannot be empty";
+      }
+    }
+
+    return new AppointmentEntity(id, insuredId, scheduleId, countryISO, status);
   }
 }
