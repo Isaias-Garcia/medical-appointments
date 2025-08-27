@@ -6,7 +6,8 @@ node_modules
 .serverless/
 
 # Database (Prisma)
-prisma/migrations/
+prisma-cl/client
+prisma-pe/client
 
 # Jest config secrets
 jest.config.js
