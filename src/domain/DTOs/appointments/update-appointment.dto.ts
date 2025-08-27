@@ -1,14 +1,25 @@
+import { CountryISO } from "../../../shared/types";
+
 export class UpdateAppointmentDto {
   private constructor(
+    public readonly id: string,
     public readonly insuredId?: string,
     public readonly scheduleId?: number,
-    public readonly countryISO?: "PE" | "CL"
+    public readonly countryISO?: CountryISO,
+    public readonly status?: string
   ) {}
 
   static create(props: {
     [key: string]: any;
   }): [string | undefined, UpdateAppointmentDto | undefined] {
-    const { insuredId, scheduleId, countryISO } = props;
+    const { id, insuredId, scheduleId, countryISO, status } = props;
+
+    if (typeof id !== "string") {
+      return ["id must be a string", undefined];
+    }
+    if (!id.trim()) {
+      return ["id cannot be empty", undefined];
+    }
 
     if (insuredId !== undefined) {
       if (typeof insuredId !== "string") {
@@ -31,6 +42,10 @@ export class UpdateAppointmentDto {
       }
     }
 
+    if (status !== undefined && typeof status !== "string") {
+      return ["status must be a string if provided", undefined];
+    }
+
     if (
       insuredId === undefined &&
       scheduleId === undefined &&
@@ -39,9 +54,17 @@ export class UpdateAppointmentDto {
       return ["At least one field must be provided for update", undefined];
     }
 
+    const finalStatus = "COMPLETED";
+
     return [
       undefined,
-      new UpdateAppointmentDto(insuredId, scheduleId, countryISO),
+      new UpdateAppointmentDto(
+        id,
+        insuredId,
+        scheduleId,
+        countryISO,
+        finalStatus
+      ),
     ];
   }
 }

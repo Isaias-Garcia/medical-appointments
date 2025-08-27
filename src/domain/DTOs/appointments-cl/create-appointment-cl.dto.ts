@@ -1,15 +1,17 @@
+import { CountryISO } from "../../../shared/types";
+
 export class CreateAppointmentCLDto {
   private constructor(
     public readonly insuredId: string,
     public readonly scheduleId: number,
-    public readonly countryISO: "PE" | "CL",
-    public readonly status: string = "COMPLETED"
+    public readonly countryISO: CountryISO,
+    public readonly status: string
   ) {}
 
   static create(props: {
     [key: string]: any;
   }): [string | undefined, CreateAppointmentCLDto | undefined] {
-    const { insuredId, scheduleId, countryISO, estado } = props;
+    const { insuredId, scheduleId, countryISO, status } = props;
 
     if (!insuredId || typeof insuredId !== "string") {
       return ["insuredId is required and must be a string", undefined];
@@ -30,13 +32,19 @@ export class CreateAppointmentCLDto {
       ];
     }
 
+    if (status !== undefined && typeof status !== "string") {
+      return ["status must be a string if provided", undefined];
+    }
+
+    const finalStatus = "COMPLETED";
+
     return [
       undefined,
       new CreateAppointmentCLDto(
         insuredId,
         scheduleId,
         countryISO,
-        estado ?? "PENDING"
+        finalStatus
       ),
     ];
   }

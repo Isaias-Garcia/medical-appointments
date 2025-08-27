@@ -1,8 +1,11 @@
+import { CountryISO } from "../../../shared/types";
+
 export class CreateAppointmentDto {
   private constructor(
     public readonly insuredId: string,
     public readonly scheduleId: number,
-    public readonly countryISO: "PE" | "CL"
+    public readonly countryISO: CountryISO,
+    public readonly status: string = "PENDING"
   ) {}
 
   toPlainObject() {
@@ -11,7 +14,7 @@ export class CreateAppointmentDto {
       insuredId: this.insuredId,
       scheduleId: this.scheduleId,
       countryISO: this.countryISO,
-      status: "PENDING",
+      status: this.status,
       createdAt: new Date().toISOString(),
     };
   }
