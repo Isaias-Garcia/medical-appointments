@@ -1,15 +1,22 @@
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
+import {
+  APIGatewayProxyEvent,
+  APIGatewayProxyResult,
+  SQSEvent,
+} from "aws-lambda";
 import {
   CreateAppointmentDto,
   CreateAppointment,
   GetAppointment,
   GetAppointments,
+  UpdateAppointmentDto,
+  UpdateAppointment,
 } from "../../domain";
 import {
   AppointmentDatasourceImpl,
   AppointmentRepositoryImpl,
   NotificationService,
 } from "../../infrastructure";
+import { EventBridgeMessage } from "../../shared/types/appointment.types";
 
 const datasource = new AppointmentDatasourceImpl();
 const appointmentRepository = new AppointmentRepositoryImpl(datasource);
@@ -43,6 +50,25 @@ export const createAppointment = async (
       appointment,
     }),
   };
+};
+
+export const updateAppointment = async (event: SQSEvent) => {
+  for (const record of event.Records) {
+    const body: EventBridgeMessage = JSON.parse(record.body);
+
+    const [error, updateAppointmentDto] = UpdateAppointmentDto.create(
+      body.detail.data
+    );
+    if (error) {
+      console.log({ error });
+    }
+
+    const appointment = await new UpdateAppointment(
+      appointmentRepository
+    ).execute(updateAppointmentDto!);
+
+    console.log({ appointment });
+  }
 };
 
 export const getAppointmentById = async (
