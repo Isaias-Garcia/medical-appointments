@@ -17,4 +17,5 @@ export {
   GetAppointments,
   CreateAppointmentPE,
   CreateAppointmentCL,
+  UpdateAppointment,
 } from "./use-cases/index";

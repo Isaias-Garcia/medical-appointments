@@ -1,6 +1,6 @@
-// src/infrastructure/services/notification.service.ts
 import { PublishCommand } from "@aws-sdk/client-sns";
 import { snsClient } from "../aws/snsClient";
+
 import { AppointmentEntity } from "../../domain";
 
 export class NotificationService {

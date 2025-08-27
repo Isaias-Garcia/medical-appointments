@@ -9,3 +9,4 @@ export {
   AppointmentPERepositoryImpl,
 } from "./repositories/index";
 export { NotificationService } from "./services/sns.service";
+export { EventBridgeService } from "./services/eventBridge.service";

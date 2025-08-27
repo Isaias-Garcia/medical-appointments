@@ -3,6 +3,8 @@ import {
   PutCommand,
   PutCommandInput,
   ScanCommand,
+  UpdateCommand,
+  UpdateCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 import { dynamoDb } from "../../data/dynamoDB";
 import {
@@ -17,13 +19,16 @@ export class AppointmentDatasourceImpl implements AppointmentDatasource {
   async create(
     createAppointmentDto: CreateAppointmentDto
   ): Promise<AppointmentEntity> {
+    const appointmentDto = createAppointmentDto.toPlainObject();
     const data: PutCommandInput = {
       TableName: process.env.APPOINTMENTS_TABLE!,
-      Item: createAppointmentDto.toPlainObject(),
+      Item: appointmentDto,
     };
     await dynamoDb.send(new PutCommand(data));
 
-    return AppointmentEntity.fromJson({ ...createAppointmentDto });
+    const appointment = await this.findById(appointmentDto.id);
+
+    return AppointmentEntity.fromJson(appointment);
   }
 
   async getAll(): Promise<AppointmentEntity[]> {
@@ -31,9 +36,6 @@ export class AppointmentDatasourceImpl implements AppointmentDatasource {
       new ScanCommand({ TableName: process.env.APPOINTMENTS_TABLE })
     );
 
-    console.log("Raw scan result:", JSON.stringify(result, null, 2));
-    console.log("First item structure:", result.Items?.[0]);
-    console.log("Type of first item id:", typeof result.Items?.[0]?.id);
     const appointments = result.Items ?? [];
 
     return appointments.map(AppointmentEntity.fromJson);
@@ -55,13 +57,22 @@ export class AppointmentDatasourceImpl implements AppointmentDatasource {
   async updateById(
     updateAppointmentDto: UpdateAppointmentDto
   ): Promise<AppointmentEntity> {
-    // await this.findById(updateTodoDTo.id);
-    // const updatedTodo = await prisma.todo.update({
-    //   where: { id: updateTodoDTo.id },
-    //   data: updateTodoDTo!.values,
-    // });
+    const data: UpdateCommandInput = {
+      TableName: process.env.APPOINTMENTS_TABLE!,
+      Key: {
+        id: updateAppointmentDto.id,
+      },
+      UpdateExpression: "SET #status = :status",
+      ExpressionAttributeNames: {
+        "#status": "status",
+      },
+      ExpressionAttributeValues: {
+        ":status": updateAppointmentDto.status,
+      },
+    };
 
-    // return AppointmentEntity.fromJson(updatedTodo);
-    throw Error("No implement");
+    await dynamoDb.send(new UpdateCommand(data));
+
+    return AppointmentEntity.fromJson(updateAppointmentDto);
   }
 }

@@ -1,26 +1,34 @@
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
+import { SQSEvent } from "aws-lambda";
 import { CreateAppointmentPE, CreateAppointmentPEDto } from "../../domain";
 import {
   AppointmentPEDatasourceImpl,
   AppointmentPERepositoryImpl,
+  EventBridgeService,
 } from "../../infrastructure";
+import { AppointmentSNSMessage } from "../../shared/types";
 
 const datasource = new AppointmentPEDatasourceImpl();
 const appointmentPERepository = new AppointmentPERepositoryImpl(datasource);
+const eventBridgeService = new EventBridgeService();
 
-export const createAppointmentPE = async (
-  event: APIGatewayProxyEvent
-): Promise<void> => {
-  const body = event.body ? JSON.parse(event.body) : {};
+export const createAppointmentPE = async (event: SQSEvent): Promise<void> => {
+  for (const record of event.Records) {
+    const snsMessage: AppointmentSNSMessage = JSON.parse(record.body);
+    const body = JSON.parse(snsMessage.Message);
 
-  const [error, createAppointmentPEDto] = CreateAppointmentPEDto.create(body);
-  if (error) {
-    console.log({ error });
+    const [error, createAppointmentPEDto] = CreateAppointmentPEDto.create(
+      body.data
+    );
+    if (error) {
+      console.log({ error });
+    }
+
+    await new CreateAppointmentPE(appointmentPERepository).execute(
+      createAppointmentPEDto!
+    );
+
+    await eventBridgeService.publishAppointmentCreated(body.data);
+
+    console.log("Success");
   }
-
-  await new CreateAppointmentPE(appointmentPERepository).execute(
-    createAppointmentPEDto!
-  );
-
-  console.log("Success");
 };
